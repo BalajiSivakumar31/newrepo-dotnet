@@ -1,31 +1,31 @@
 
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from "@aws-sdk/client-secrets-manager";
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Model;
 
-const secret_name = "MyApp/ExternalService";
+var secretName = "MyApp/ExternalService";
+var client = new AmazonSecretsManagerClient(Amazon.RegionEndpoint.APSouth1);
 
-const client = new SecretsManagerClient({
-  region: "ap-south-2",
-});
+string secretValue;
 
-let response;
+try
+{
+    var request = new GetSecretValueRequest
+    {
+        SecretId = secretName,
+        VersionStage = "AWSCURRENT"
+    };
 
-try {
-  response = await client.send(
-    new GetSecretValueCommand({
-      SecretId: secret_name,
-      VersionStage: "AWSCURRENT", // VersionStage defaults to AWSCURRENT if unspecified
-    })
-  );
-} catch (error) {
-  // For a list of exceptions thrown, see
-  // https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-  throw error;
+    var response = await client.GetSecretValueAsync(request);
+    secretValue = response.SecretString;
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error fetching secret: {ex.Message}");
+    throw;
 }
 
-const secret = response.SecretString;
+Console.WriteLine(secretValue);
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,4 +52,5 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.Run();
+
 
