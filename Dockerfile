@@ -1,10 +1,10 @@
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY . /src
 RUN dotnet publish dotnet-folder.csproj -c release -o app/publish
 
 # # Final Stage
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-jammy AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy AS final
 WORKDIR /app
 # # Create non-root user
 ARG USERNAME=devops-non
