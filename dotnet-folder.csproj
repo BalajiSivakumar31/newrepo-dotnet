@@ -7,5 +7,10 @@
     <RootNamespace>dotnet_folder</RootNamespace>
   </PropertyGroup>
 
+<ItemGroup>
+  <PackageReference Include="Amazon.Extensions.Configuration.SecretsManager" Version="*" />
+</ItemGroup>
+
 </Project>
+
 
