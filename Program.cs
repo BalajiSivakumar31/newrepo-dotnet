@@ -1,15 +1,26 @@
+using Amazon.Extensions.Configuration.SecretsManager;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddRazorPages();
+// 1️⃣ Load appsettings.json
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+
+// 2️⃣ Load AWS Secrets Manager
+builder.Configuration.AddSecretsManager(options =>
+{
+    options.SecretFilter = entry => entry.Name == "MyApp/ExternalService";
+    options.KeyGenerator = (entry, key) => key;
+});
+
+
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 4️⃣ Configure middleware
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -17,7 +28,6 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-
 app.UseAuthorization();
 
 app.MapRazorPages();
