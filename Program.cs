@@ -3,6 +3,7 @@ using Amazon.Extensions.Configuration.SecretsManager;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1️⃣ Load appsettings.json
+
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
@@ -33,3 +34,4 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.Run();
+
