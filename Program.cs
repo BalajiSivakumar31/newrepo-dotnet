@@ -1,60 +1,70 @@
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
+using System.Text.Json;
 
-static async Task GetSecret()
-{
-    string secretName = "MyApp/ExternalService";
-    string region = "ap-south-2";
-
-    IAmazonSecretsManager client = new AmazonSecretsManagerClient(RegionEndpoint.GetBySystemName(region));
-
-    GetSecretValueRequest request = new GetSecretValueRequest
-    {
-        SecretId = secretName,
-        VersionStage = "AWSCURRENT", // VersionStage defaults to AWSCURRENT if unspecified.
-    };
-
-    GetSecretValueResponse response;
-
-    try
-    {
-        response = await client.GetSecretValueAsync(request);
-    }
-    catch (Exception e)
-    {
-        // For a list of the exceptions thrown, see
-        // https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-        throw e;
-    }
-
-    string secret = response.SecretString;
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Load secret at startup
+var secretJson = await GetSecretAsync();
+var secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(secretJson);
+
+// Example: add secrets to configuration
+if (secrets != null)
+{
+    foreach (var kv in secrets)
+    {
+        builder.Configuration[kv.Key] = kv.Value;
+    }
+}
+
+// Add services
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Middleware pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseAuthorization();
 
 app.MapRazorPages();
-
 app.Run();
 
 
+// ---------------- HELPER METHOD ----------------
 
+static async Task<string> GetSecretAsync()
+{
+    string secretName = "MyApp/ExternalService";
+    string region = "ap-south-2";
+
+    using var client = new AmazonSecretsManagerClient(
+        RegionEndpoint.GetBySystemName(region));
+
+    var request = new GetSecretValueRequest
+    {
+        SecretId = secretName,
+        VersionStage = "AWSCURRENT"
+    };
+
+    try
+    {
+        var response = await client.GetSecretValueAsync(request);
+        return response.SecretString 
+               ?? throw new Exception("SecretString is null");
+    }
+    catch
+    {
+        // preserves stack trace
+        throw;
+    }
+}
 
