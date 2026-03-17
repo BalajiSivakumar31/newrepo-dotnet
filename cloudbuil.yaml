@@ -1,0 +1,17 @@
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+      - .
+
+  # Push image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+
+images:
+  - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
