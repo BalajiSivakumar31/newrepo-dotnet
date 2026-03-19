@@ -1,4 +1,5 @@
 steps:
+  # 1️⃣ Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - build
@@ -6,6 +7,36 @@ steps:
       - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
       - .
 
+  # 2️⃣ Pull Trivy cache (if exists)
+  - name: 'gcr.io/cloud-builders/gsutil'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gsutil -m cp -r gs://trivy-cache-cloudbuild-490507/trivy-db /workspace/.trivy || echo "No cache found"
+
+  # 3️⃣ Run Trivy scan
+  - name: 'aquasec/trivy:latest'
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        trivy image \
+        --cache-dir /workspace/.trivy \
+        --exit-code 1 \
+        --severity HIGH,CRITICAL \
+        asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+
+  # 4️⃣ Push updated cache back to GCS
+  - name: 'gcr.io/cloud-builders/gsutil'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gsutil -m rm -rf gs://trivy-cache-cloudbuild-490507/trivy-db || true
+        gsutil -m cp -r /workspace/.trivy gs://trivy-cache-cloudbuild-490507/trivy-db
+
+  # 5️⃣ Push image (only if scan passed)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
