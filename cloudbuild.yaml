@@ -44,38 +44,38 @@ steps:
 
   # 6️⃣ Smart Deploy (first-time OR blue/green)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  id: 'Smart Deploy'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      SERVICE=dotnet-app
-      REGION=asia-south1
-      IMAGE=asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
-
-      echo "Checking if service exists..."
-
-      if gcloud run services describe $$SERVICE --region $$REGION > /dev/null 2>&1; then
-        echo "Service exists → Blue/Green deployment"
-
-        gcloud run deploy $$SERVICE \
-          --image $$IMAGE \
-          --region $$REGION \
-          --platform managed \
-          --no-traffic
-
-        echo "bluegreen" > /workspace/deploy_type.txt
-      else
-        echo "First deployment → Direct deploy"
-
-        gcloud run deploy $$SERVICE \
-          --image $$IMAGE \
-          --region $$REGION \
-          --platform managed \
-          --allow-unauthenticated
-
-        echo "first" > /workspace/deploy_type.txt
-      fi
+    id: 'Smart Deploy'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        SERVICE=dotnet-app
+        REGION=asia-south1
+        IMAGE=asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+  
+        echo "Checking if service exists..."
+  
+        if gcloud run services describe $$SERVICE --region $$REGION > /dev/null 2>&1; then
+          echo "Service exists → Blue/Green deployment"
+  
+          gcloud run deploy $$SERVICE \
+            --image $$IMAGE \
+            --region $$REGION \
+            --platform managed \
+            --no-traffic
+  
+          echo "bluegreen" > /workspace/deploy_type.txt
+        else
+          echo "First deployment → Direct deploy"
+  
+          gcloud run deploy $$SERVICE \
+            --image $$IMAGE \
+            --region $$REGION \
+            --platform managed \
+            --allow-unauthenticated
+  
+          echo "first" > /workspace/deploy_type.txt
+        fi
 
   # 7️⃣ Get latest revision URL (only for blue/green)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
