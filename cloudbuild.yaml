@@ -36,11 +36,124 @@ steps:
         gsutil -m rm -rf gs://trivy-cache-cloudbuild-490507/trivy-db || true
         gsutil -m cp -r /workspace/.trivy gs://trivy-cache-cloudbuild-490507/trivy-db
 
-  # 5️⃣ Push image (only if scan passed)
+  # 5️⃣ Push image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
       - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+
+  # 6️⃣ Smart Deploy (first-time OR blue/green)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Smart Deploy'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        SERVICE=dotnet-app
+        REGION=asia-south1
+        IMAGE=asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
+
+        echo "Checking if service exists..."
+
+        if gcloud run services describe $SERVICE --region $REGION > /dev/null 2>&1; then
+          echo "Service exists → Blue/Green deployment"
+
+          gcloud run deploy $SERVICE \
+            --image $IMAGE \
+            --region $REGION \
+            --platform managed \
+            --no-traffic
+
+          echo "bluegreen" > /workspace/deploy_type.txt
+        else
+          echo "First deployment → Direct deploy"
+
+          gcloud run deploy $SERVICE \
+            --image $IMAGE \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated
+
+          echo "first" > /workspace/deploy_type.txt
+        fi
+
+  # 7️⃣ Get latest revision URL (only for blue/green)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Get Revision URL'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        TYPE=$(cat /workspace/deploy_type.txt)
+
+        if [ "$TYPE" = "first" ]; then
+          echo "Skipping revision fetch (first deploy)"
+          exit 0
+        fi
+
+        REVISION=$(gcloud run revisions list \
+          --service dotnet-app \
+          --region asia-south1 \
+          --format="value(metadata.name)" \
+          --sort-by="~metadata.creationTimestamp" \
+          --limit=1)
+
+        URL=$(gcloud run revisions describe $REVISION \
+          --region asia-south1 \
+          --format="value(status.address.url)")
+
+        echo $URL > /workspace/revision_url.txt
+
+  # 8️⃣ Test new version
+  - name: 'curlimages/curl'
+    id: 'Test New Version'
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        TYPE=$(cat /workspace/deploy_type.txt)
+
+        if [ "$TYPE" = "first" ]; then
+          echo "Skipping test (first deploy)"
+          exit 0
+        fi
+
+        URL=$(cat /workspace/revision_url.txt)
+
+        echo "Testing $URL"
+
+        for i in 1 2 3 4 5; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+          echo "Attempt $i: Status $STATUS"
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Test passed ✅"
+            exit 0
+          fi
+
+          sleep 10
+        done
+
+        echo "Test failed ❌"
+        exit 1
+
+  # 9️⃣ Switch traffic
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Switch Traffic'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        TYPE=$(cat /workspace/deploy_type.txt)
+
+        if [ "$TYPE" = "first" ]; then
+          echo "Skipping traffic switch"
+          exit 0
+        fi
+
+        gcloud run services update-traffic dotnet-app \
+          --to-latest \
+          --region asia-south1
 
 images:
   - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
