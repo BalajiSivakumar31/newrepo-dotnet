@@ -43,7 +43,7 @@ steps:
       - asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
 
   # 6️⃣ Smart Deploy (first-time OR blue/green)
- - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'Smart Deploy'
   entrypoint: bash
   args:
