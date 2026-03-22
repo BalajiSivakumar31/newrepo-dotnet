@@ -49,6 +49,8 @@ steps:
     args:
       - -c
       - |
+        set -e
+
         SERVICE=dotnet-app
         REGION=asia-south1
         IMAGE=asia-south1-docker.pkg.dev/cloudbuild-490507/my-repo/dotnet-app:$COMMIT_SHA
@@ -77,19 +79,23 @@ steps:
           echo "first" > /workspace/deploy_type.txt
         fi
 
-  # 7️⃣ Get latest revision URL
+  # 7️⃣ Get latest revision URL (FIXED)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Get Revision URL'
     entrypoint: bash
     args:
       - -c
       - |
+        set -e
+
         TYPE=$$(cat /workspace/deploy_type.txt)
 
         if [ "$$TYPE" = "first" ]; then
           echo "Skipping revision fetch (first deploy)"
           exit 0
         fi
+
+        echo "Fetching latest revision..."
 
         REVISION=$$(gcloud run revisions list \
           --service dotnet-app \
@@ -98,19 +104,35 @@ steps:
           --sort-by="~metadata.creationTimestamp" \
           --limit=1)
 
-        URL=$$(gcloud run revisions describe $$REVISION \
-          --region asia-south1 \
-          --format="value(status.address.url)")
+        echo "Revision: $$REVISION"
 
-        echo $$URL > /workspace/revision_url.txt
+        for i in {1..10}; do
+          URL=$$(gcloud run revisions describe $$REVISION \
+            --region asia-south1 \
+            --format="value(status.address.url)")
 
-  # 8️⃣ Test new version
+          if [ -n "$$URL" ]; then
+            echo "URL found: $$URL"
+            echo $$URL > /workspace/revision_url.txt
+            exit 0
+          fi
+
+          echo "Waiting for revision URL..."
+          sleep 5
+        done
+
+        echo "Failed to get revision URL ❌"
+        exit 1
+
+  # 8️⃣ Test new version (FIXED)
   - name: 'curlimages/curl'
     id: 'Test New Version'
     entrypoint: sh
     args:
       - -c
       - |
+        set -e
+
         TYPE=$$(cat /workspace/deploy_type.txt)
 
         if [ "$$TYPE" = "first" ]; then
@@ -118,15 +140,26 @@ steps:
           exit 0
         fi
 
+        if [ ! -f /workspace/revision_url.txt ]; then
+          echo "URL file missing ❌"
+          exit 1
+        fi
+
         URL=$$(cat /workspace/revision_url.txt)
+
+        if [ -z "$$URL" ]; then
+          echo "URL is empty ❌"
+          exit 1
+        fi
 
         echo "Testing $$URL"
 
         for i in 1 2 3 4 5; do
-          STATUS=$$(curl -s -o /dev/null -w "%{http_code}" $$URL)
+          STATUS=$$(curl -s -o /dev/null -w "%{http_code}" $$URL || echo 000)
+
           echo "Attempt $$i: Status $$STATUS"
 
-          if [ "$$STATUS" -eq 200 ]; then
+          if [ "$$STATUS" = "200" ]; then
             echo "Test passed ✅"
             exit 0
           fi
@@ -144,6 +177,8 @@ steps:
     args:
       - -c
       - |
+        set -e
+
         TYPE=$$(cat /workspace/deploy_type.txt)
 
         if [ "$$TYPE" = "first" ]; then
